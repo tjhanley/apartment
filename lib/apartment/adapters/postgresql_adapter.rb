@@ -27,7 +27,8 @@ module Apartment
     class PostgresqlSchemaAdapter < AbstractAdapter
       def initialize(config)
         super
-
+        puts "Yo soy aqui"
+        puts "config: #{config.inspect}"
         reset
       end
 
@@ -71,12 +72,18 @@ module Apartment
       #   Set schema search path to new schema
       #
       def connect_to_new(tenant = nil)
+        puts "#{__method__}: #{tenant.inspect}"
+        # puts "Thread:\n#{Thread.current.backtrace.join("\n")}"
         return reset if tenant.nil?
         raise ActiveRecord::StatementInvalid, "Could not find schema #{tenant}" unless schema_exists?(tenant)
 
         @current = tenant.is_a?(Array) ? tenant.map(&:to_s) : tenant.to_s
-        Apartment.connection.schema_search_path = full_search_path
+        puts "##### Current: #{@current}"
 
+        Apartment.connection.schema_search_path = full_search_path
+        puts "#### full_search_path: #{full_search_path}"
+        puts "#### #{postgresql_version}"
+        puts "#### #{postgresql_version < 90_300}"
         # When the PostgreSQL version is < 9.3,
         # there is a issue for prepared statement with changing search_path.
         # https://www.postgresql.org/docs/9.3/static/sql-prepare.html
@@ -130,9 +137,19 @@ module Apartment
       end
 
       def schema_exists?(schemas)
+        puts "#{__method__}: #{Apartment.tenant_presence_check.inspect}"
         return true unless Apartment.tenant_presence_check
 
-        Array(schemas).all? { |schema| Apartment.connection.schema_exists?(schema.to_s) }
+        puts "\tschema: #{schemas}"
+        puts "\tArray(schemas): #{Array(schemas)}"
+        puts "\tArray(schemas).all?: #{Array(schemas)}"
+
+        Array(schemas).all? { |schema|
+          puts "\tInside Array(schemas): #{schema}"
+          puts "\t\t Apartment.connection.schema_exists?(schema.to_s): #{Apartment.connection.schema_exists?(schema.to_s)}"
+          puts "\t\t Apartment.connection.schema_search_path: #{Apartment.connection.schema_search_path}"
+          Apartment.connection.schema_exists?(schema.to_s)
+        }
       end
 
       def raise_schema_connect_to_new(tenant, exception)
@@ -157,6 +174,7 @@ module Apartment
       ].freeze
 
       def import_database_schema
+        puts "#{__method__}"
         preserving_search_path do
           clone_pg_schema
           copy_schema_migrations
@@ -170,6 +188,7 @@ module Apartment
       # and it mut be reset
       #
       def preserving_search_path
+        puts "#{__method__}"
         search_path = Apartment.connection.execute('show search_path').first['search_path']
         yield
         Apartment.connection.execute("set search_path = #{search_path}")
@@ -178,6 +197,7 @@ module Apartment
       # Clone default schema into new schema named after current tenant
       #
       def clone_pg_schema
+        puts "#{__method__}"
         pg_schema_sql = patch_search_path(pg_dump_schema)
         Apartment.connection.execute(pg_schema_sql)
       end
@@ -185,6 +205,7 @@ module Apartment
       # Copy data from schema_migrations into new schema
       #
       def copy_schema_migrations
+        puts "#{__method__}"
         pg_migrations_data = patch_search_path(pg_dump_schema_migrations_data)
         Apartment.connection.execute(pg_migrations_data)
       end

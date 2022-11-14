@@ -23,8 +23,10 @@ module Apartment
       def create(tenant)
         run_callbacks :create do
           create_tenant(tenant)
-
+          puts "#{self.class} #{__method__}:Create tenant, should call switch next"
+          puts "######## TENENT -> #{tenant.inspect}"
           switch(tenant) do
+            puts "#{self.class} #{__method__}: Before import db schema"
             import_database_schema
 
             # Seed data if appropriate
@@ -72,6 +74,7 @@ module Apartment
       #   @param {String} tenant name
       #
       def switch!(tenant = nil)
+        puts "#### #{__method__.inspect} : tenant #{tenant}"
         run_callbacks :switch do
           connect_to_new(tenant).tap do
             Apartment.connection.clear_query_cache
@@ -84,7 +87,11 @@ module Apartment
       #   @param {String?} tenant to connect to
       #
       def switch(tenant = nil)
+        puts "#### #{__method__.inspect} : tenant #{tenant}"
+        puts "######## caller #{caller_locations(1,1)[0].label}"
         previous_tenant = current
+        puts "#### #{__method__.inspect} : previous_tenant #{previous_tenant}"
+        puts "calling switch! with tenant #{tenant} with #{Apartment.connection.schema_search_path}"
         switch!(tenant)
         yield
       ensure
@@ -210,6 +217,7 @@ module Apartment
       # rubocop:enable Style/OptionalBooleanParameter
 
       def multi_tenantify_with_tenant_db_name(config, tenant)
+        puts "#{__method__}: #{config}"
         config[:database] = environmentify(tenant)
       end
 
@@ -244,6 +252,7 @@ module Apartment
           # neutral connection is necessary whenever you need to create/remove a database from a server.
           # example: when you use postgresql, you need to connect to the default postgresql database before you create
           # your own.
+          puts "#{__method__}: #{SeparateDbConnectionHandler.establish_connection(multi_tenantify(tenant, false)).inspect} "
           SeparateDbConnectionHandler.establish_connection(multi_tenantify(tenant, false))
           yield(SeparateDbConnectionHandler.connection)
           SeparateDbConnectionHandler.connection.close
